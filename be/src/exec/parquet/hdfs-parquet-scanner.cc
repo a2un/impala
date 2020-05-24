@@ -349,7 +349,13 @@ Status HdfsParquetScanner::ProcessSplit() {
     }
     unique_ptr<RowBatch> batch = make_unique<RowBatch>(scan_node_->row_desc(),
         state_->batch_size(), scan_node_->mem_tracker());
+    if (scan_node_->is_partition_key_scan()) batch->limit_capacity(1);
     Status status = GetNextInternal(batch.get());
+
+    // If we are doing a partition key scan, we are done scanning the file after
+    // returning at least one row.
+    if (scan_node_->is_partition_key_scan() && batch->num_rows() > 0) eos_ = true;
+
     // Always add batch to the queue because it may contain data referenced by previously
     // appended batches.
     scan_node->AddMaterializedRowBatch(move(batch));
@@ -540,7 +546,8 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     if (stats_read) {
       TupleRow row;
       row.SetTuple(0, min_max_tuple_);
-      if (!eval->EvalPredicate(&row)) {
+      // Accept NULL as the predicate can contain a CAST which may fail.
+      if (!eval->EvalPredicateAcceptNull(&row)) {
         *skip_row_group = true;
         break;
       }
@@ -770,7 +777,8 @@ Status HdfsParquetScanner::EvaluatePageIndex(bool* filter_pages) {
       if (!is_null_page && !value_read) continue;
       TupleRow row;
       row.SetTuple(0, min_max_tuple_);
-      if (is_null_page || !eval->EvalPredicate(&row)) {
+      // Accept NULL as the predicate can contain a CAST which may fail.
+      if (is_null_page || !eval->EvalPredicateAcceptNull(&row)) {
         BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
         RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk,
             &scalar_reader->offset_index_));

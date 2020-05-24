@@ -24,4 +24,5 @@ enum HashAlgorithm {
   UNKNOWN_HASH = 0;
   MURMUR_HASH_2 = 1;
   CITY_HASH = 2;
+  FAST_HASH = 3;
 }

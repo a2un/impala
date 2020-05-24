@@ -384,6 +384,21 @@ struct TPartialTableInfo {
   // SqlConstraints for the table, small enough that we can
   // return them wholesale.
   8: optional SqlConstraints.TSqlConstraints sql_constraints
+
+  // Valid write id list of ACID table.
+  9: optional CatalogObjects.TValidWriteIdList valid_write_ids;
+}
+
+struct TBriefTableMeta {
+  // Name of the table
+  1: required string name
+
+  // HMS table type of the table: EXTERNAL_TABLE, MANAGED_TABLE, VIRTUAL_VIEW, etc.
+  // Unset if the table is unloaded.
+  2: optional string msType
+
+  // Comment(remark) of the table. Unset if the table is unloaded.
+  3: optional string comment
 }
 
 // Selector for partial information about a Database.
@@ -391,8 +406,8 @@ struct TDbInfoSelector {
   // The response should include the HMS Database object.
   1: bool want_hms_database
 
-  // The response should include the list of table names in the DB.
-  2: bool want_table_names
+  // The response should include TBriefTableMeta of tables in the DB.
+  2: bool want_brief_meta_of_tables
 
   // The response should include the list of function names in the DB.
   3: bool want_function_names
@@ -401,7 +416,7 @@ struct TDbInfoSelector {
 // Returned information about a Database, as selected by TDbInfoSelector.
 struct TPartialDbInfo {
   1: optional hive_metastore.Database hms_database
-  2: optional list<string> table_names
+  2: optional list<TBriefTableMeta> brief_meta_of_tables
   3: optional list<string> function_names
 }
 
@@ -507,23 +522,6 @@ struct TPrioritizeLoadResponse {
   1: required Status.TStatus status
 }
 
-// Request to perform a privilege check with the Sentry Service to determine
-// if the requesting user is a Sentry Service admin.
-struct TSentryAdminCheckRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
-
-  // Common header included in all CatalogService requests.
-  2: optional TCatalogServiceRequestHeader header
-}
-
-struct TSentryAdminCheckResponse {
-  // Returns OK if the operation was successful.
-  1: optional Status.TStatus status
-
-  // Returns true if the user is a Sentry admin user.
-  2: required bool is_admin
-}
-
 struct TTableUsage {
   1: required CatalogObjects.TTableName table_name
   // count of usages since the last report
@@ -565,13 +563,6 @@ service CatalogService {
   // Prioritize the loading of metadata for the CatalogObjects specified in the
   // TPrioritizeLoadRequest.
   TPrioritizeLoadResponse PrioritizeLoad(1: TPrioritizeLoadRequest req);
-
-  // Performs a check with the Sentry Service to determine if the requesting user
-  // is configured as an admin on the Sentry Service. This API may be removed in
-  // the future and external clients should not rely on using it.
-  // TODO: When Sentry Service has a better mechanism to perform these changes this API
-  // should be deprecated.
-  TSentryAdminCheckResponse SentryAdminCheck(1: TSentryAdminCheckRequest req);
 
   // Fetch partial information about some object in the catalog.
   TGetPartialCatalogObjectResponse GetPartialCatalogObject(
